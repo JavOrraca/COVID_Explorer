@@ -1,0 +1,535 @@
+---
+title: "COVID-19 Explorer"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+# Install devtools version since it is updated daily
+#devtools::install_github("RamiKrispin/coronavirus", force = TRUE)
+
+# Load packages
+library(flexdashboard)
+library(tidyverse)
+library(wppExplorer)
+library(plotly)
+library(tsibble)
+library(fable)
+library(feasts)
+
+# Set color profiles
+confirmed_color <- "forestgreen"
+active_color <- "#1f77b4"
+recovered_color <- "forestgreen"
+death_color <- "red"
+
+# Collect USA details by City and County
+df_details <- read.csv("https://coronadatascraper.com/timeseries.csv",
+                        stringsAsFactors = FALSE)
+
+df_details_country <- df_details %>% 
+  filter(county == "",
+         city == "", 
+         state == "") %>% 
+  group_by(country) %>% 
+  filter(date == last(date)) %>% 
+  mutate_at(vars(cases:tested), replace_na, 0)
+
+df_details_USA_tested <- df_details_country %>% 
+  filter(country == "USA")
+
+data(iso3166)
+iso3166 <- iso3166 %>% 
+  mutate(name = as.character(name),
+         charcode = as.character(charcode),
+         charcode3 = as.character(charcode3))
+
+COVID_cumsum <- df_details %>% 
+  filter(city == "", 
+         county == "",
+         state == "") %>% 
+  select(-city, -county, -state) %>% 
+  mutate_at(vars(cases:tested), replace_na, 0) %>% 
+  rename(Country_Code = country,
+         Date = date,
+         Confirmed = cases,
+         Recovered = recovered,
+         Death = deaths,
+         Tested = tested) %>% 
+  left_join(iso3166, by = c("Country_Code" = "charcode3")) %>% 
+  filter(is.country == "TRUE") %>% 
+  select(-charcode, -uncode, -is.country) %>% 
+  select(Country = name, everything()) %>% 
+  mutate(Country = str_replace(Country, "United States", "US"),
+         Country = str_replace(Country, "Iran, Islamic Republic Of", "Iran"),
+         Country = str_replace(Country, "Korea, Republic of", "South Korea"),
+         Country = str_replace(Country, "Russian Federation", "Russia"),
+         Country = str_replace(Country, "Taiwan, Province Of China", "Taiwan"),
+         Country = str_replace(Country, "Venezuela, Bolivarian Republic of", "Venezuela"),
+         Country = str_replace(Country, "Viet Nam", "Vietnam"),
+         Country = str_replace(Country, "Macedonia, the Former Yugoslav Republic Of", "Macedonia"),
+         Country = str_replace(Country, "Moldova, Republic of", "Moldova"),
+         Date = lubridate::ymd(Date))
+
+COVID_cumsum_USA_by_County <- df_details %>% 
+  filter(country == "USA",
+         city == "",
+         county != "",
+         state != "") %>% 
+  select(-city) %>% 
+  mutate_at(vars(cases:tested), replace_na, 0) %>% 
+  rename(County = county,
+         State = state,
+         Country_Code = country,
+         Date = date,
+         Confirmed = cases,
+         Recovered = recovered,
+         Death = deaths,
+         Tested = tested) %>% 
+  mutate(Country = "US",
+         Date = lubridate::ymd(Date)) %>% 
+  select(Country, State, County, everything())
+
+COVID_cumsum_USA_by_State <- df_details %>% 
+  filter(country == "USA",
+         city == "",
+         county == "",
+         state != "") %>% 
+  select(-country, -city, -county) %>% 
+  mutate_at(vars(cases:tested), replace_na, 0) %>% 
+  rename(State = state,
+         Date = date,
+         Confirmed = cases,
+         Recovered = recovered,
+         Death = deaths,
+         Tested = tested) %>% 
+  mutate(Date = lubridate::ymd(Date)) %>% 
+  select(State, everything())
+
+COVID_cumsum_USA_by_County_map <- COVID_cumsum_USA_by_County %>% 
+  filter(Date == last(Date)) %>% 
+  mutate(Percent_of_County_Infected = Confirmed / population) %>% 
+  arrange(Percent_of_County_Infected)
+
+COVID_cumsum_confirmed <- COVID_cumsum %>% 
+  group_by(Country) %>% 
+  filter(Date == last(Date)) %>%  
+  ungroup() %>% 
+  select(Country, Date, Confirmed) %>% 
+  arrange(-Confirmed)
+
+COVID_cumsum_death <- COVID_cumsum %>% 
+  group_by(Country) %>% 
+  filter(Date == last(Date)) %>%  
+  ungroup() %>%
+  select(Country, Date, Death) %>% 
+  arrange(-Death)
+
+COVID_Date_of_100 <- COVID_cumsum %>% 
+  arrange(Country, Date) %>% 
+  group_by(Country) %>% 
+  filter(Confirmed >= 100) %>% 
+  mutate(Date_100_Surpassed = first(Date)) %>% 
+  filter(Confirmed == first(Confirmed)) %>% 
+  ungroup() %>% 
+  rename(Cases_When_100_Surpassed = Confirmed) %>% 
+  distinct(Country, Date_100_Surpassed, Cases_When_100_Surpassed)
+
+COVID_totals <- COVID_cumsum %>% 
+  group_by(Country) %>% 
+  filter(Date == last(Date)) %>%  
+  ungroup() %>%
+  select(Country, Date, Confirmed, Death, population) %>% 
+  left_join(COVID_Date_of_100, by = c("Country" = "Country")) %>% 
+  mutate(Days_Since_100_Surpassed = as.integer(difftime(last(Date), Date_100_Surpassed, units = "days")),
+         Infected_per_Day_since_100 = round((Confirmed - Cases_When_100_Surpassed)/Days_Since_100_Surpassed, 0)) %>% 
+  arrange(-Infected_per_Day_since_100) %>% 
+  mutate(Percent_Pop_Confirmed = Confirmed/population,
+         Death_Rate = Death/Confirmed)
+
+COVID_cumsum_plotly_confirmed <- COVID_cumsum %>% 
+  filter(Country %in% head(COVID_totals$Country, n = 10))
+
+COVID_series_confirmed <- COVID_cumsum %>% 
+  select(Country, Date, Confirmed) %>% 
+  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
+  as_tsibble(index = Date, key = Country)
+
+COVID_series_death <- COVID_cumsum %>% 
+  select(Country, Date, Death) %>% 
+  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
+  as_tsibble(index = Date, key = Country)
+
+COVID_series_confirmed_fit <- COVID_series_confirmed %>% 
+  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_death_fit <- COVID_series_death %>% 
+  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_confirmed_fcast <- COVID_series_confirmed_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_series_death_fcast <- COVID_series_death_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_confirmed_fcast_df <- COVID_series_confirmed_fcast %>% 
+  as_tsibble() %>% 
+  select(Country, Date, Values = Confirmed) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+COVID_death_fcast_df <- COVID_series_death_fcast %>% 
+  as_tsibble() %>% 
+  select(Country, Date, Values = Death) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+# Join actuals and forecast
+temp_COVID_cumsum_confirmed_hist <- COVID_cumsum %>% 
+  select(Country, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+temp_COVID_cumsum_death_hist <- COVID_cumsum %>% 
+  select(Country, Date, Values = Death) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_confirmed_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_confirmed_hist %>%
+          filter(Country %in% head(COVID_totals$Country, n = 10)),
+        COVID_confirmed_fcast_df)
+
+COVID_cumsum_death_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_death_hist %>%
+          filter(Country %in% head(COVID_totals$Country, n = 10)),
+        COVID_death_fcast_df)
+
+
+
+
+
+# Replicate time series ARIMA forecast by State, missing implicit dates as needed
+COVID_series_USA_confirmed <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Confirmed) %>% 
+  as_tsibble(index = Date, key = State) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_USA_death <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Death) %>% 
+  as_tsibble(index = Date, key = State) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_USA_confirmed_fit <- COVID_series_USA_confirmed %>% 
+  model(arima = ARIMA(Confirmed, stepwise = TRUE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_USA_death_fit <- COVID_series_USA_death %>% 
+  model(arima = ARIMA(Death, stepwise = TRUE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_USA_confirmed_fcast <- COVID_series_USA_confirmed_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_series_USA_death_fcast <- COVID_series_USA_death_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_USA_confirmed_fcast_df <- COVID_series_USA_confirmed_fcast %>% 
+  as_tsibble() %>% 
+  select(State, Date, Values = Confirmed) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+COVID_USA_death_fcast_df <- COVID_series_USA_death_fcast %>% 
+  as_tsibble() %>% 
+  select(State, Date, Values = Death) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+# Join actuals and forecast
+temp_COVID_cumsum_USA_confirmed_hist <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+temp_COVID_cumsum_USA_death_hist <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Values = Death) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_USA_confirmed_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_USA_confirmed_hist,
+        COVID_USA_confirmed_fcast_df)
+
+COVID_cumsum_USA_death_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_USA_confirmed_hist,
+        COVID_USA_death_fcast_df)
+```
+
+Current Global Status
+======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### confirmed {.value-box}
+
+```{r}
+valueBox(value = paste(format(sum(df_details_country$cases), big.mark = ","), "", sep = " "), 
+         caption = "Global: Confirmed Cases", 
+         icon = "fas fa-user-md")
+```
+
+### death {.value-box}
+
+```{r}
+valueBox(value = paste(format(sum(df_details_country$deaths, na.rm = TRUE), big.mark = ","), " (",
+                       round(100 * sum(df_details_country$deaths, na.rm = TRUE) / sum(df_details_country$cases), 1), 
+                       "%)", sep = ""),
+         caption = "Global: Death Rate", 
+         icon = "fas fa-heartbeat", 
+         color = death_color)
+```
+
+### tested {.value-box}
+
+```{r}
+valueBox(value = paste(format(df_details_USA_tested$tested, big.mark = ","), "", sep = " "), 
+         caption = "USA: Total Tested",
+         icon = "fas fa-ambulance")
+```
+
+### confirmed_USA {.value-box}
+
+```{r}
+valueBox(value = paste(format(df_details_USA_tested$cases, big.mark = ","), " (",
+                       round(100 * df_details_USA_tested$cases / df_details_USA_tested$tested, 1), 
+                       "%)", sep = ""), 
+         caption = "USA: Confirmed Cases", 
+         icon = "fas fa-user-md")
+```
+
+### death_USA {.value-box}
+
+```{r}
+valueBox(value = paste(format(df_details_USA_tested$deaths, big.mark = ","), " (",
+                       round(100 * df_details_USA_tested$deaths / df_details_USA_tested$cases, 1), 
+                       "%)", sep = ""),
+         caption = "USA: Death Rate", 
+         icon = "fas fa-heartbeat",
+         color = death_color)
+```
+
+Row
+-----------------------------------------------------------------------
+
+### **Confirmed Cases of Coronavirus**
+
+```{r}
+plot_ly(COVID_cumsum_plotly_confirmed,
+        x = ~Date,
+        y = ~Confirmed,
+        name = ~Country,
+        type = "scatter",
+        mode = "lines",
+        hoverinfo = "text",
+        text = ~paste("Country:", Country,
+                      "</br></br> Date:", Date,
+                      "</br> Confirmed:", format(Confirmed, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Confirmed Cases"))
+```
+
+Row
+-----------------------------------------------------------------------
+
+### **Daily COVID-19 New Infected since exceeding Country's 100th Case**
+
+```{r}
+plot_ly(head(COVID_totals, n = 25),
+        x = ~Infected_per_Day_since_100,
+        y = ~reorder(Country, Infected_per_Day_since_100),
+        type = "bar",
+        marker = list(color = 'rgba(58, 71, 80, 0.50)',
+                      line = list(color = 'rgba(58, 71, 80, 1.0)',
+                                  width = 1)),
+        hoverinfo = "text",
+        text = ~paste("Infected:",
+                      "</br></br>", format(Infected_per_Day_since_100, big.mark = ","))) %>% 
+  layout(xaxis = list(title = "Infected per Day",
+                      tickformat = ",d"),
+         yaxis = list(title = "",
+                      dtick = 1)) %>% 
+  add_annotations(x = ~Infected_per_Day_since_100 + 180,
+                  text = ~format(Infected_per_Day_since_100, big.mark = ","),
+                  showarrow = FALSE)
+```
+
+### **Percent of Population Confirmed Infected with Coronavirus**
+
+```{r}
+plot_ly(head(COVID_totals, n = 25),
+        x = ~Percent_Pop_Confirmed,
+        y = ~reorder(Country, Percent_Pop_Confirmed),
+        type = "bar",
+        marker = list(color = 'rgba(58, 71, 80, 0.50)',
+                      line = list(color = 'rgba(58, 71, 80, 1.0)',
+                                  width = 1)),
+        hoverinfo = "text",
+        text = ~paste("% of Population Infected:",
+                      "</br></br>", scales::percent(Percent_Pop_Confirmed))) %>% 
+  layout(xaxis = list(title = "Percent of Population Infected",
+                      tickformat = ".2%"),
+         yaxis = list(title = "",
+                      dtick = 1)) %>% 
+  add_annotations(x = ~Percent_Pop_Confirmed + 0.00017,
+                  text = ~scales::percent(Percent_Pop_Confirmed, accuracy = 0.001),
+                  showarrow = FALSE)
+```
+
+### **Death Rate from Confirmed Infected with Coronavirus**
+
+```{r}
+plot_ly(head(COVID_totals, n = 25),
+        x = ~Death_Rate,
+        y = ~reorder(Country, Death_Rate),
+        type = "bar",
+        marker = list(color = 'rgba(58, 71, 80, 0.50)',
+                      line = list(color = 'rgba(58, 71, 80, 1.0)',
+                                  width = 1)),
+        hoverinfo = "text",
+        text = ~paste("Death Rate:",
+                      "</br></br>", scales::percent(Death_Rate))) %>% 
+  layout(xaxis = list(title = "Death Rate as % of Confirmed Infected",
+                      tickformat = ".2%"),
+         yaxis = list(title = "",
+                      dtick = 1)) %>% 
+  add_annotations(x = ~Death_Rate + 0.0075,
+                  text = ~scales::percent(Death_Rate, accuracy = 0.01),
+                  showarrow = FALSE)
+```
+
+
+Forecast (Global)
+======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### **Forecasted Cases of Coronavirus**
+
+```{r}
+plot_ly(data = COVID_cumsum_confirmed_hist_and_pred,
+        x = ~Date,
+        y = ~Values,
+        name = ~Country,
+        type = "scatter",
+        mode = "lines",
+        hoverinfo = "text",
+        text = ~paste("Country:", Country,
+                      "</br></br> Date:", Date,
+                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Projected Cases"))
+```
+
+Row
+-----------------------------------------------------------------------
+
+### **Forecasted Coronavirus Deaths**
+
+```{r}
+plot_ly(data = COVID_cumsum_death_hist_and_pred,
+        x = ~Date,
+        y = ~Values,
+        name = ~Country,
+        type = "scatter",
+        mode = "lines",
+        hoverinfo = "text",
+        text = ~paste("Country:", Country,
+                      "</br></br> Date:", Date,
+                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Projected Deaths"))
+```
+
+Forecast (US by State)
+======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### **Forecasted Cases of Coronavirus**
+
+```{r}
+plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred, #COVID_cumsum_confirmed_hist_and_pred
+        x = ~Date,
+        y = ~Values,
+        name = ~State,
+        type = "scatter",
+        mode = "lines",
+        hoverinfo = "text",
+        text = ~paste("State:", State,
+                      "</br></br> Date:", Date,
+                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Projected Cases"))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+#Row
+#-----------------------------------------------------------------------
+
+### **Forecasted Coronavirus Deaths**
+
+#plot_ly(data = COVID_cumsum_USA_death_hist_and_pred,
+#        x = ~Date,
+#        y = ~Values,
+#        name = ~State,
+#        type = "scatter",
+#        mode = "lines",
+#        hoverinfo = "text",
+#        text = ~paste("State:", State,
+#                      "</br></br> Date:", Date,
+#                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
+#  layout(yaxis = list(title = "Projected Deaths"))
+```
+
+Map (Current US Status)
+======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### **Confirmed Cases by County**
+
+```{r}
+library(maps)
+
+COVID_cumsum_USA_by_County_map <- COVID_cumsum_USA_by_County_map %>% 
+  mutate(State_Abb = as.factor(State),
+         County_Name = as.factor(County)) %>% 
+  rename(county = County,
+         state = State) %>% 
+  select(-lat, -long)
+
+COVID_cumsum_USA_by_County_map$county <- tolower(gsub(" County", "", COVID_cumsum_USA_by_County_map$county))
+county_df <- map_data("county")
+names(county_df) <- c("long", "lat", "group", "order", "state_name", "county")
+county_df$state <- state.abb[match(county_df$state_name, tolower(state.name))]
+county_df$state_name <- NULL
+
+state_df <- map_data("state")
+choropleth <- merge(county_df, COVID_cumsum_USA_by_County_map, by = c("state", "county"))
+choropleth <- choropleth[order(choropleth$order), ]
+choropleth$Infected_Rate_Bucket <- cut(choropleth$Percent_of_County_Infected, breaks = c(seq(0, 0.002, by = 0.0005), 0.1))
+
+# create text toolbar
+choropleth$text <- with(choropleth, paste0("County: ", County_Name, "Rate: ", Percent_of_County_Infected))
+
+# Use ggplot2 for base graph then wrap plotly interactivity to it
+p <- ggplot(choropleth, aes(long, lat, group = group)) +
+  geom_polygon(aes(fill = Infected_Rate_Bucket, text = text), 
+               colour = alpha("white", 1/2), size = 0.2) + 
+  geom_polygon(data = state_df, colour = "white", fill = NA) +
+  scale_fill_brewer(palette = "OrRd") + theme_void()
+
+ggplotly(p, tooltip = "text")
+```
