@@ -1,5 +1,6 @@
 # COVID_Explorer
-### _This is a work in progress and meant as an exercise for R Markdown and flexdashboard. The forecasts are basic univariate projections that do not consider many variables in the COVID-19 crisis._
+
+This is a work in progress and meant as an exercise for R Markdown and flexdashboard. The forecasts are basic univariate projections that do not consider many variables in the COVID-19 crisis.
 
 **Data soures:**
 
