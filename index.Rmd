@@ -3,6 +3,8 @@ title: "COVID-19 Explorer"
 output: 
   flexdashboard::flex_dashboard:
     orientation: rows
+    social: menu
+    source_code: embed
     vertical_layout: fill
 ---
 
@@ -208,10 +210,6 @@ COVID_cumsum_death_hist_and_pred <-
   rbind(temp_COVID_cumsum_death_hist %>%
           filter(Country %in% head(COVID_totals$Country, n = 10)),
         COVID_death_fcast_df)
-
-
-
-
 
 # Replicate time series ARIMA forecast by State, missing implicit dates as needed
 COVID_series_USA_confirmed <- COVID_cumsum_USA_by_State %>% 
@@ -475,25 +473,6 @@ plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred, #COVID_cumsum_confirmed
 ```
 
 
-```{r eval=FALSE, include=FALSE}
-#Row
-#-----------------------------------------------------------------------
-
-### **Forecasted Coronavirus Deaths**
-
-#plot_ly(data = COVID_cumsum_USA_death_hist_and_pred,
-#        x = ~Date,
-#        y = ~Values,
-#        name = ~State,
-#        type = "scatter",
-#        mode = "lines",
-#        hoverinfo = "text",
-#        text = ~paste("State:", State,
-#                      "</br></br> Date:", Date,
-#                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
-#  layout(yaxis = list(title = "Projected Deaths"))
-```
-
 Map (Current US Status)
 ======================================================================
 
@@ -551,7 +530,7 @@ This dashboard is a work in progress and meant as an exercise for R Markdown and
  
 **R Packages:**
  
- - tidyverse (dplyr, tidyr, stringr, lubridate, purrr)
+ - tidyverse (dplyr, ggplot2, tidyr, stringr, lubridate, purrr)
  - maps
  - flexdashboard
  - wppExplorer
