@@ -359,7 +359,7 @@ plot_ly(head(COVID_totals, n = 25),
                       tickformat = ",d"),
          yaxis = list(title = "",
                       dtick = 1)) %>% 
-  add_annotations(x = ~Infected_per_Day_since_100 + 180,
+  add_annotations(x = ~Infected_per_Day_since_100 + 200,
                   text = ~format(Infected_per_Day_since_100, big.mark = ","),
                   showarrow = FALSE)
 ```
@@ -541,7 +541,7 @@ This dashboard is a work in progress and meant as an exercise for R Markdown and
  
 **Disclaimer:**
  
-The views expressed on my GitHub repositories are mine alone and do not necessarily reflect the views of Javier Orraca's employer, Health Net, a Centene Corporation company.
+The views expressed on my GitHub repositories are mine alone and do not reflect the views of Javier Orraca's employer, Health Net, a Centene Corporation company.
 
 **Additional Information:**
 
