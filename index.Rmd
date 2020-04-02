@@ -359,7 +359,7 @@ plot_ly(head(COVID_totals, n = 25),
                       tickformat = ",d"),
          yaxis = list(title = "",
                       dtick = 1)) %>% 
-  add_annotations(x = ~Infected_per_Day_since_100 + 300,
+  add_annotations(x = ~Infected_per_Day_since_100 + 320,
                   text = ~format(Infected_per_Day_since_100, big.mark = ","),
                   showarrow = FALSE)
 ```
