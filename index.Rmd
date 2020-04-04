@@ -29,30 +29,30 @@ death_color <- "red"
 
 # Collect USA details by City and County
 df_details <- read.csv("https://coronadatascraper.com/timeseries.csv",
-                        stringsAsFactors = FALSE)
+                       stringsAsFactors = FALSE)
 
 df_details_country <- df_details %>% 
-  filter(county == "",
-         city == "", 
-         state == "") %>% 
+  filter(level == "country",
+         aggregate == "state") %>% 
+  select(-name, -level) %>% 
   group_by(country) %>% 
   filter(date == last(date)) %>% 
   mutate_at(vars(cases:tested), replace_na, 0)
 
 df_details_USA_tested <- df_details_country %>% 
-  filter(country == "USA")
+  filter(country == "United States")
 
 data(iso3166)
+
 iso3166 <- iso3166 %>% 
   mutate(name = as.character(name),
-         charcode = as.character(charcode),
-         charcode3 = as.character(charcode3))
+         a2 = as.character(charcode),
+         a3 = as.character(charcode3))
 
 COVID_cumsum <- df_details %>% 
-  filter(city == "", 
-         county == "",
-         state == "") %>% 
-  select(-city, -county, -state) %>% 
+  filter(level == "country") %>% 
+  mutate(country = str_replace(country, "United States", "USA")) %>% 
+  select(-name, -level, -city, -county, -state) %>% 
   mutate_at(vars(cases:tested), replace_na, 0) %>% 
   rename(Country_Code = country,
          Date = date,
@@ -60,9 +60,9 @@ COVID_cumsum <- df_details %>%
          Recovered = recovered,
          Death = deaths,
          Tested = tested) %>% 
-  left_join(iso3166, by = c("Country_Code" = "charcode3")) %>% 
+  left_join(iso3166, by = c("Country_Code" = "a3")) %>% 
   filter(is.country == "TRUE") %>% 
-  select(-charcode, -uncode, -is.country) %>% 
+  select(-a2, -uncode, -is.country) %>% 
   select(Country = name, everything()) %>% 
   mutate(Country = str_replace(Country, "United States", "US"),
          Country = str_replace(Country, "Iran, Islamic Republic Of", "Iran"),
@@ -76,11 +76,10 @@ COVID_cumsum <- df_details %>%
          Date = lubridate::ymd(Date))
 
 COVID_cumsum_USA_by_County <- df_details %>% 
-  filter(country == "USA",
-         city == "",
-         county != "",
-         state != "") %>% 
-  select(-city) %>% 
+  filter(level == "county",
+         aggregate == "county",
+         country == "United States") %>% 
+  select(-name, -level, -city) %>% 
   mutate_at(vars(cases:tested), replace_na, 0) %>% 
   rename(County = county,
          State = state,
@@ -94,12 +93,15 @@ COVID_cumsum_USA_by_County <- df_details %>%
          Date = lubridate::ymd(Date)) %>% 
   select(Country, State, County, everything())
 
+test <- df_details %>%
+  filter(country == "USA" | country == "United States") %>% 
+  distinct(name, level, state, country, aggregate)
+
 COVID_cumsum_USA_by_State <- df_details %>% 
-  filter(country == "USA",
-         city == "",
-         county == "",
-         state != "") %>% 
-  select(-country, -city, -county) %>% 
+  filter(level == "state",
+         aggregate == "county",
+         country == "United States") %>% 
+  select(-name, -level, -country, -city, -county) %>% 
   mutate_at(vars(cases:tested), replace_na, 0) %>% 
   rename(State = state,
          Date = date,
@@ -155,13 +157,13 @@ COVID_cumsum_plotly_confirmed <- COVID_cumsum %>%
   filter(Country %in% head(COVID_totals$Country, n = 10))
 
 COVID_series_confirmed <- COVID_cumsum %>% 
-  select(Country, Date, Confirmed) %>% 
+  distinct(Country, Date, Confirmed) %>% 
   filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
   as_tsibble(index = Date, key = Country) %>% 
   fill_gaps(.full = TRUE)
 
 COVID_series_death <- COVID_cumsum %>% 
-  select(Country, Date, Death) %>% 
+  distinct(Country, Date, Death) %>% 
   filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
   as_tsibble(index = Date, key = Country) %>% 
   fill_gaps(.full = TRUE)
@@ -223,10 +225,10 @@ COVID_series_USA_death <- COVID_cumsum_USA_by_State %>%
   fill_gaps(.full = TRUE)
 
 COVID_series_USA_confirmed_fit <- COVID_series_USA_confirmed %>% 
-  model(arima = ARIMA(Confirmed, stepwise = TRUE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
 
 COVID_series_USA_death_fit <- COVID_series_USA_death %>% 
-  model(arima = ARIMA(Death, stepwise = TRUE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
 
 COVID_series_USA_confirmed_fcast <- COVID_series_USA_confirmed_fit %>% 
   forecast(h = "4 weeks")
@@ -264,6 +266,30 @@ COVID_cumsum_USA_confirmed_hist_and_pred <-
 COVID_cumsum_USA_death_hist_and_pred <- 
   rbind(temp_COVID_cumsum_USA_confirmed_hist,
         COVID_USA_death_fcast_df)
+
+# Rolling averages
+COVID_cumsum_plotly_confirmed_3dayMA <- COVID_cumsum_plotly_confirmed %>% 
+  group_by(Country) %>% 
+  mutate(Confirmed_Lag = lag(Confirmed, n = 3),
+         Rolling_Avg_3_day = round((Confirmed - Confirmed_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_USA_confirmed_hist_3dayMA <- temp_COVID_cumsum_USA_confirmed_hist %>% 
+  group_by(State) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_California_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "California") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_California_by_county_3dayMA <- COVID_cumsum_California_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
 ```
 
 Current Global Status
@@ -359,7 +385,7 @@ plot_ly(head(COVID_totals, n = 25),
                       tickformat = ",d"),
          yaxis = list(title = "",
                       dtick = 1)) %>% 
-  add_annotations(x = ~Infected_per_Day_since_100 + 320,
+  add_annotations(x = ~Infected_per_Day_since_100 + 340,
                   text = ~format(Infected_per_Day_since_100, big.mark = ","),
                   showarrow = FALSE)
 ```
@@ -459,7 +485,7 @@ Row
 ### **Forecasted Cases of Coronavirus**
 
 ```{r}
-plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred, #COVID_cumsum_confirmed_hist_and_pred
+plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred,
         x = ~Date,
         y = ~Values,
         name = ~State,
@@ -472,6 +498,46 @@ plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred, #COVID_cumsum_confirmed
   layout(yaxis = list(title = "Projected Cases"))
 ```
 
+Rolling Averages (US & California)
+======================================================================
+
+Row
+-----------------------------------------------------------------------
+
+### **3-day Rolling Average of new Coronavirus Cases by US State**
+
+```{r}
+plot_ly(COVID_cumsum_USA_confirmed_hist_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~State,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("State:", State,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+Row
+-----------------------------------------------------------------------
+
+### **3-day Rolling Average of new Coronavirus Cases by California county**
+
+```{r}
+plot_ly(COVID_cumsum_California_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
 
 Map (Current US Status)
 ======================================================================
@@ -485,34 +551,31 @@ Row
 library(maps)
 
 COVID_cumsum_USA_by_County_map <- COVID_cumsum_USA_by_County_map %>% 
-  mutate(State_Abb = as.factor(State),
-         County_Name = as.factor(County)) %>% 
+  mutate(State_Name = as.factor(State),
+         County_Name = as.factor(County),
+         state_lower = tolower(State)) %>% 
   rename(county = County,
          state = State) %>% 
   select(-lat, -long)
 
 COVID_cumsum_USA_by_County_map$county <- tolower(gsub(" County", "", COVID_cumsum_USA_by_County_map$county))
 county_df <- map_data("county")
-names(county_df) <- c("long", "lat", "group", "order", "state_name", "county")
-county_df$state <- state.abb[match(county_df$state_name, tolower(state.name))]
-county_df$state_name <- NULL
+names(county_df) <- c("long", "lat", "group", "order", "state_lower", "county")
 
 state_df <- map_data("state")
-choropleth <- merge(county_df, COVID_cumsum_USA_by_County_map, by = c("state", "county"))
+
+choropleth <- merge(county_df, COVID_cumsum_USA_by_County_map, by = c("state_lower", "county"))
 choropleth <- choropleth[order(choropleth$order), ]
 choropleth$Infected_Rate_Bucket <- cut(choropleth$Percent_of_County_Infected, breaks = c(seq(0, 0.002, by = 0.0005), 0.1))
 
-# create text toolbar
-choropleth$text <- with(choropleth, paste0("County: ", County_Name, "Rate: ", Percent_of_County_Infected))
-
 # Use ggplot2 for base graph then wrap plotly interactivity to it
 p <- ggplot(choropleth, aes(long, lat, group = group)) +
-  geom_polygon(aes(fill = Infected_Rate_Bucket, text = text), 
+  geom_polygon(aes(fill = Infected_Rate_Bucket), 
                colour = alpha("white", 1/2), size = 0.2) + 
   geom_polygon(data = state_df, colour = "white", fill = NA) +
   scale_fill_brewer(palette = "OrRd") + theme_void()
 
-ggplotly(p, tooltip = "text")
+ggplotly(p)
 ```
 
 About
