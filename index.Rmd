@@ -93,10 +93,6 @@ COVID_cumsum_USA_by_County <- df_details %>%
          Date = lubridate::ymd(Date)) %>% 
   select(Country, State, County, everything())
 
-test <- df_details %>%
-  filter(country == "USA" | country == "United States") %>% 
-  distinct(name, level, state, country, aggregate)
-
 COVID_cumsum_USA_by_State <- df_details %>% 
   filter(level == "state",
          aggregate == "county",
@@ -286,6 +282,105 @@ COVID_cumsum_California_by_county <- COVID_cumsum_USA_by_County %>%
   mutate(Values = as.numeric(Values))
 
 COVID_cumsum_California_by_county_3dayMA <- COVID_cumsum_California_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_GA_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Georgia") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_GA_by_county_3dayMA <- COVID_cumsum_GA_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_IL_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Illinois") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_IL_by_county_3dayMA <- COVID_cumsum_IL_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_FL_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Florida") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_FL_by_county_3dayMA <- COVID_cumsum_FL_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_NY_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "New York") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_NY_by_county_3dayMA <- COVID_cumsum_NY_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_DC_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Washington, D.C.") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_DC_by_county_3dayMA <- COVID_cumsum_DC_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_CO_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Colorado") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_CO_by_county_3dayMA <- COVID_cumsum_CO_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_TX_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Texas") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_TX_by_county_3dayMA <- COVID_cumsum_TX_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_OH_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "Ohio") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_OH_by_county_3dayMA <- COVID_cumsum_OH_by_county %>% 
+  group_by(County) %>% 
+  mutate(Values_Lag = lag(Values, n = 3),
+         Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
+         Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
+
+COVID_cumsum_SC_by_county <- COVID_cumsum_USA_by_County %>% 
+  filter(State == "South Carolina") %>% 
+  select(County, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_SC_by_county_3dayMA <- COVID_cumsum_SC_by_county %>% 
   group_by(County) %>% 
   mutate(Values_Lag = lag(Values, n = 3),
          Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
@@ -498,7 +593,7 @@ plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred,
   layout(yaxis = list(title = "Projected Cases"))
 ```
 
-Rolling Averages (US & California)
+Rolling Averages (US & by State)
 ======================================================================
 
 Row
@@ -520,13 +615,141 @@ plot_ly(COVID_cumsum_USA_confirmed_hist_3dayMA,
   layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
 ```
 
-Row
+Row {.tabset}
 -----------------------------------------------------------------------
 
-### **3-day Rolling Average of new Coronavirus Cases by California county**
+### **California**
 
 ```{r}
 plot_ly(COVID_cumsum_California_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Colorado**
+
+```{r}
+plot_ly(COVID_cumsum_CO_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Florida**
+
+```{r}
+plot_ly(COVID_cumsum_FL_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Georgia**
+
+```{r}
+plot_ly(COVID_cumsum_GA_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **New York**
+
+```{r}
+plot_ly(COVID_cumsum_NY_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Ohio**
+
+```{r}
+plot_ly(COVID_cumsum_OH_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **South Carolina**
+
+```{r}
+plot_ly(COVID_cumsum_SC_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Texas**
+
+```{r}
+plot_ly(COVID_cumsum_TX_by_county_3dayMA,
+        x = ~Date,
+        y = ~Rolling_Avg_3_day,
+        name = ~County,
+        type = "scatter",
+        mode = "lines+markers",
+        hoverinfo = "text",
+        text = ~paste("County:", County,
+                      "</br></br> Date:", Date,
+                      "</br> New Cases Rolling Avg:", format(Rolling_Avg_3_day, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "3-day Rolling Average of new Coronavirus Cases"))
+```
+
+### **Washington, D.C.**
+
+```{r}
+plot_ly(COVID_cumsum_DC_by_county_3dayMA,
         x = ~Date,
         y = ~Rolling_Avg_3_day,
         name = ~County,
