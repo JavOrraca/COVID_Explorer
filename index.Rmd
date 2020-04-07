@@ -465,7 +465,7 @@ plot_ly(head(COVID_totals, n = 25),
                       tickformat = ",d"),
          yaxis = list(title = "",
                       dtick = 1)) %>% 
-  add_annotations(x = ~Infected_per_Day_since_100 + 340,
+  add_annotations(x = ~Infected_per_Day_since_100 + 380,
                   text = ~format(Infected_per_Day_since_100, big.mark = ","),
                   showarrow = FALSE)
 ```
@@ -487,7 +487,7 @@ plot_ly(head(COVID_totals, n = 25),
                       tickformat = ".2%"),
          yaxis = list(title = "",
                       dtick = 1)) %>% 
-  add_annotations(x = ~Percent_Pop_Confirmed + 0.00015,
+  add_annotations(x = ~Percent_Pop_Confirmed + 0.00019,
                   text = ~scales::percent(Percent_Pop_Confirmed, accuracy = 0.001),
                   showarrow = FALSE)
 ```
