@@ -32,9 +32,9 @@ df_details <- read.csv("https://coronadatascraper.com/timeseries.csv",
                        stringsAsFactors = FALSE)
 
 df_details_country <- df_details %>% 
-  filter(level == "country",
-         aggregate == "state") %>% 
+  filter(level == "country") %>% 
   select(-name, -level) %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
   group_by(country) %>% 
   filter(date == last(date)) %>% 
   mutate_at(vars(cases:tested), replace_na, 0)
@@ -51,29 +51,15 @@ iso3166 <- iso3166 %>%
 
 COVID_cumsum <- df_details %>% 
   filter(level == "country") %>% 
-  mutate(country = str_replace(country, "United States", "USA")) %>% 
   select(-name, -level, -city, -county, -state) %>% 
   mutate_at(vars(cases:tested), replace_na, 0) %>% 
-  rename(Country_Code = country,
+  mutate(date = lubridate::ymd(date)) %>% 
+  rename(Country = country,
          Date = date,
          Confirmed = cases,
          Recovered = recovered,
          Death = deaths,
-         Tested = tested) %>% 
-  left_join(iso3166, by = c("Country_Code" = "a3")) %>% 
-  filter(is.country == "TRUE") %>% 
-  select(-a2, -uncode, -is.country) %>% 
-  select(Country = name, everything()) %>% 
-  mutate(Country = str_replace(Country, "United States", "US"),
-         Country = str_replace(Country, "Iran, Islamic Republic Of", "Iran"),
-         Country = str_replace(Country, "Korea, Republic of", "South Korea"),
-         Country = str_replace(Country, "Russian Federation", "Russia"),
-         Country = str_replace(Country, "Taiwan, Province Of China", "Taiwan"),
-         Country = str_replace(Country, "Venezuela, Bolivarian Republic of", "Venezuela"),
-         Country = str_replace(Country, "Viet Nam", "Vietnam"),
-         Country = str_replace(Country, "Macedonia, the Former Yugoslav Republic Of", "Macedonia"),
-         Country = str_replace(Country, "Moldova, Republic of", "Moldova"),
-         Date = lubridate::ymd(Date))
+         Tested = tested)
 
 COVID_cumsum_USA_by_County <- df_details %>% 
   filter(level == "county",
@@ -83,14 +69,13 @@ COVID_cumsum_USA_by_County <- df_details %>%
   mutate_at(vars(cases:tested), replace_na, 0) %>% 
   rename(County = county,
          State = state,
-         Country_Code = country,
+         Country = country,
          Date = date,
          Confirmed = cases,
          Recovered = recovered,
          Death = deaths,
          Tested = tested) %>% 
-  mutate(Country = "US",
-         Date = lubridate::ymd(Date)) %>% 
+  mutate(Date = lubridate::ymd(Date)) %>% 
   select(Country, State, County, everything())
 
 COVID_cumsum_USA_by_State <- df_details %>% 
