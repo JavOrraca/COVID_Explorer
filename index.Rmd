@@ -93,6 +93,10 @@ COVID_cumsum_USA_by_State <- df_details %>%
   mutate(Date = lubridate::ymd(Date)) %>% 
   select(State, everything())
 
+temp_COVID_cumsum_USA_confirmed_hist <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
 COVID_cumsum_USA_by_County_map <- COVID_cumsum_USA_by_County %>% 
   filter(Date == last(Date)) %>% 
   mutate(Percent_of_County_Infected = Confirmed / population) %>% 
@@ -137,116 +141,13 @@ COVID_totals <- COVID_cumsum %>%
 COVID_cumsum_plotly_confirmed <- COVID_cumsum %>% 
   filter(Country %in% head(COVID_totals$Country, n = 10))
 
-COVID_series_confirmed <- COVID_cumsum %>% 
-  distinct(Country, Date, Confirmed) %>% 
-  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
-  as_tsibble(index = Date, key = Country) %>% 
-  fill_gaps(.full = TRUE)
-
-COVID_series_death <- COVID_cumsum %>% 
-  distinct(Country, Date, Death) %>% 
-  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
-  as_tsibble(index = Date, key = Country) %>% 
-  fill_gaps(.full = TRUE)
-
-COVID_series_confirmed_fit <- COVID_series_confirmed %>% 
-  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
-
-COVID_series_death_fit <- COVID_series_death %>% 
-  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
-
-COVID_series_confirmed_fcast <- COVID_series_confirmed_fit %>% 
-  forecast(h = "4 weeks")
-
-COVID_series_death_fcast <- COVID_series_death_fit %>% 
-  forecast(h = "4 weeks")
-
-COVID_confirmed_fcast_df <- COVID_series_confirmed_fcast %>% 
-  as_tsibble() %>% 
-  select(Country, Date, Values = Confirmed) %>% 
-  lapply(unlist) %>% 
-  as_tibble() %>% 
-  mutate(Values = round(Values, digits = 0))
-
-COVID_death_fcast_df <- COVID_series_death_fcast %>% 
-  as_tsibble() %>% 
-  select(Country, Date, Values = Death) %>% 
-  lapply(unlist) %>% 
-  as_tibble() %>% 
-  mutate(Values = round(Values, digits = 0))
-
-# Join actuals and forecast
-temp_COVID_cumsum_confirmed_hist <- COVID_cumsum %>% 
-  select(Country, Date, Values = Confirmed) %>% 
-  mutate(Values = as.numeric(Values))
-
-temp_COVID_cumsum_death_hist <- COVID_cumsum %>% 
-  select(Country, Date, Values = Death) %>% 
-  mutate(Values = as.numeric(Values))
-
-COVID_cumsum_confirmed_hist_and_pred <- 
-  rbind(temp_COVID_cumsum_confirmed_hist %>%
-          filter(Country %in% head(COVID_totals$Country, n = 10)),
-        COVID_confirmed_fcast_df)
-
-COVID_cumsum_death_hist_and_pred <- 
-  rbind(temp_COVID_cumsum_death_hist %>%
-          filter(Country %in% head(COVID_totals$Country, n = 10)),
-        COVID_death_fcast_df)
-
-# Replicate time series ARIMA forecast by State, missing implicit dates as needed
-COVID_series_USA_confirmed <- COVID_cumsum_USA_by_State %>% 
-  select(State, Date, Confirmed) %>% 
-  as_tsibble(index = Date, key = State) %>% 
-  fill_gaps(.full = TRUE)
-
-COVID_series_USA_death <- COVID_cumsum_USA_by_State %>% 
-  select(State, Date, Death) %>% 
-  as_tsibble(index = Date, key = State) %>% 
-  fill_gaps(.full = TRUE)
-
-COVID_series_USA_confirmed_fit <- COVID_series_USA_confirmed %>% 
-  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
-
-COVID_series_USA_death_fit <- COVID_series_USA_death %>% 
-  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
-
-COVID_series_USA_confirmed_fcast <- COVID_series_USA_confirmed_fit %>% 
-  forecast(h = "4 weeks")
-
-COVID_series_USA_death_fcast <- COVID_series_USA_death_fit %>% 
-  forecast(h = "4 weeks")
-
-COVID_USA_confirmed_fcast_df <- COVID_series_USA_confirmed_fcast %>% 
-  as_tsibble() %>% 
-  select(State, Date, Values = Confirmed) %>% 
-  lapply(unlist) %>% 
-  as_tibble() %>% 
-  mutate(Values = round(Values, digits = 0))
-
-COVID_USA_death_fcast_df <- COVID_series_USA_death_fcast %>% 
-  as_tsibble() %>% 
-  select(State, Date, Values = Death) %>% 
-  lapply(unlist) %>% 
-  as_tibble() %>% 
-  mutate(Values = round(Values, digits = 0))
-
-# Join actuals and forecast
-temp_COVID_cumsum_USA_confirmed_hist <- COVID_cumsum_USA_by_State %>% 
-  select(State, Date, Values = Confirmed) %>% 
-  mutate(Values = as.numeric(Values))
-
-temp_COVID_cumsum_USA_death_hist <- COVID_cumsum_USA_by_State %>% 
-  select(State, Date, Values = Death) %>% 
-  mutate(Values = as.numeric(Values))
-
-COVID_cumsum_USA_confirmed_hist_and_pred <- 
-  rbind(temp_COVID_cumsum_USA_confirmed_hist,
-        COVID_USA_confirmed_fcast_df)
-
-COVID_cumsum_USA_death_hist_and_pred <- 
-  rbind(temp_COVID_cumsum_USA_confirmed_hist,
-        COVID_USA_death_fcast_df)
+COVID_cumsum_plotly_deaths_per_mil <- COVID_cumsum %>% 
+  mutate(Deaths_per_Million = round(Death / population * 1000000, 0),
+         Deaths_per_Million = if_else(is.na(Deaths_per_Million), 0, Deaths_per_Million))
+  
+COVID_cumsum_USA_by_State_deaths_per_mil <- COVID_cumsum_USA_by_State %>% 
+  mutate(Deaths_per_Million = round(Death / population * 1000000, 0),
+         Deaths_per_Million = if_else(is.na(Deaths_per_Million), 0, Deaths_per_Million))
 
 # Rolling averages
 COVID_cumsum_plotly_confirmed_3dayMA <- COVID_cumsum_plotly_confirmed %>% 
@@ -371,6 +272,121 @@ COVID_cumsum_SC_by_county_3dayMA <- COVID_cumsum_SC_by_county %>%
          Rolling_Avg_3_day = round((Values - Values_Lag)/3, 0),
          Rolling_Avg_3_day = if_else(is.na(Rolling_Avg_3_day), 0, Rolling_Avg_3_day))
 ```
+
+```{r eval=FALSE}
+# Time-consuming forecasting moved here as a result of forecast tabs being deleted
+COVID_series_confirmed <- COVID_cumsum %>% 
+  distinct(Country, Date, Confirmed) %>% 
+  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
+  as_tsibble(index = Date, key = Country) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_death <- COVID_cumsum %>% 
+  distinct(Country, Date, Death) %>% 
+  filter(Country %in% head(COVID_totals$Country, n = 10)) %>%
+  as_tsibble(index = Date, key = Country) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_confirmed_fit <- COVID_series_confirmed %>% 
+  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_death_fit <- COVID_series_death %>% 
+  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_confirmed_fcast <- COVID_series_confirmed_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_series_death_fcast <- COVID_series_death_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_confirmed_fcast_df <- COVID_series_confirmed_fcast %>% 
+  as_tsibble() %>% 
+  select(Country, Date, Values = Confirmed) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+COVID_death_fcast_df <- COVID_series_death_fcast %>% 
+  as_tsibble() %>% 
+  select(Country, Date, Values = Death) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+# Join actuals and forecast
+temp_COVID_cumsum_confirmed_hist <- COVID_cumsum %>% 
+  select(Country, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+temp_COVID_cumsum_death_hist <- COVID_cumsum %>% 
+  select(Country, Date, Values = Death) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_confirmed_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_confirmed_hist %>%
+          filter(Country %in% head(COVID_totals$Country, n = 10)),
+        COVID_confirmed_fcast_df)
+
+COVID_cumsum_death_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_death_hist %>%
+          filter(Country %in% head(COVID_totals$Country, n = 10)),
+        COVID_death_fcast_df)
+
+# Replicate time series ARIMA forecast by State, missing implicit dates as needed
+COVID_series_USA_confirmed <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Confirmed) %>% 
+  as_tsibble(index = Date, key = State) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_USA_death <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Death) %>% 
+  as_tsibble(index = Date, key = State) %>% 
+  fill_gaps(.full = TRUE)
+
+COVID_series_USA_confirmed_fit <- COVID_series_USA_confirmed %>% 
+  model(arima = ARIMA(Confirmed, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_USA_death_fit <- COVID_series_USA_death %>% 
+  model(arima = ARIMA(Death, stepwise = FALSE, approximation = FALSE)) #, stepwise = FALSE, approximation = FALSE
+
+COVID_series_USA_confirmed_fcast <- COVID_series_USA_confirmed_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_series_USA_death_fcast <- COVID_series_USA_death_fit %>% 
+  forecast(h = "4 weeks")
+
+COVID_USA_confirmed_fcast_df <- COVID_series_USA_confirmed_fcast %>% 
+  as_tsibble() %>% 
+  select(State, Date, Values = Confirmed) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+COVID_USA_death_fcast_df <- COVID_series_USA_death_fcast %>% 
+  as_tsibble() %>% 
+  select(State, Date, Values = Death) %>% 
+  lapply(unlist) %>% 
+  as_tibble() %>% 
+  mutate(Values = round(Values, digits = 0))
+
+# Join actuals and forecast
+temp_COVID_cumsum_USA_confirmed_hist <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Values = Confirmed) %>% 
+  mutate(Values = as.numeric(Values))
+
+temp_COVID_cumsum_USA_death_hist <- COVID_cumsum_USA_by_State %>% 
+  select(State, Date, Values = Death) %>% 
+  mutate(Values = as.numeric(Values))
+
+COVID_cumsum_USA_confirmed_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_USA_confirmed_hist,
+        COVID_USA_confirmed_fcast_df)
+
+COVID_cumsum_USA_death_hist_and_pred <- 
+  rbind(temp_COVID_cumsum_USA_confirmed_hist,
+        COVID_USA_death_fcast_df)
+```
+
 
 Current Global Status
 ======================================================================
@@ -514,69 +530,47 @@ plot_ly(head(COVID_totals, n = 25),
                   showarrow = FALSE)
 ```
 
-
-Forecast (Global)
+Deaths per Million
 ======================================================================
 
 Row
 -----------------------------------------------------------------------
 
-### **Forecasted Cases of Coronavirus**
+### **Coronavirus Deaths per Million, by Country**
 
 ```{r}
-plot_ly(data = COVID_cumsum_confirmed_hist_and_pred,
+plot_ly(data = COVID_cumsum_plotly_deaths_per_mil,
         x = ~Date,
-        y = ~Values,
+        y = ~Deaths_per_Million,
         name = ~Country,
         type = "scatter",
         mode = "lines",
         hoverinfo = "text",
         text = ~paste("Country:", Country,
                       "</br></br> Date:", Date,
-                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
-  layout(yaxis = list(title = "Projected Cases"))
+                      "</br> Deaths per Million:", format(Deaths_per_Million, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Deaths per Million"))
 ```
 
 Row
 -----------------------------------------------------------------------
 
-### **Forecasted Coronavirus Deaths**
+### **Coronavirus Deaths per Million, by US State**
 
 ```{r}
-plot_ly(data = COVID_cumsum_death_hist_and_pred,
+plot_ly(data = COVID_cumsum_USA_by_State_deaths_per_mil,
         x = ~Date,
-        y = ~Values,
-        name = ~Country,
-        type = "scatter",
-        mode = "lines",
-        hoverinfo = "text",
-        text = ~paste("Country:", Country,
-                      "</br></br> Date:", Date,
-                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
-  layout(yaxis = list(title = "Projected Deaths"))
-```
-
-Forecast (US by State)
-======================================================================
-
-Row
------------------------------------------------------------------------
-
-### **Forecasted Cases of Coronavirus**
-
-```{r}
-plot_ly(data = COVID_cumsum_USA_confirmed_hist_and_pred,
-        x = ~Date,
-        y = ~Values,
+        y = ~Deaths_per_Million,
         name = ~State,
         type = "scatter",
         mode = "lines",
         hoverinfo = "text",
         text = ~paste("State:", State,
                       "</br></br> Date:", Date,
-                      "</br> Confirmed:", format(Values, big.mark = ","))) %>% 
-  layout(yaxis = list(title = "Projected Cases"))
+                      "</br> Deaths per Million:", format(Deaths_per_Million, big.mark = ","))) %>% 
+  layout(yaxis = list(title = "Deaths per Million"))
 ```
+
 
 Rolling Averages (US & by State)
 ======================================================================
@@ -791,7 +785,7 @@ About
 
 ### **About the COVID-19 Explorer**
 
-This dashboard is a work in progress and meant as an exercise for R Markdown and flexdashboard. The forecasts are basic univariate projections that do not consider multiple variables in the COVID-19 crisis.
+This dashboard is a work in progress and meant as an exercise for R Markdown and flexdashboard.
 
 **Data soures:**
 
